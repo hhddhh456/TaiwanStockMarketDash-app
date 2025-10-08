@@ -33,7 +33,7 @@ TECH_STYLE = {
 }
 
 def get_years(ticker):
-    conn = sqlite3.connect("C:/Users/a0102/OneDrive/桌面/所有程式/STOCKDATA/newstock_data/newstock_data.db")
+    conn = sqlite3.connect("newstock_data.db")
     df = pd.read_sql_query(f"SELECT DISTINCT Year FROM {ticker}", conn)
     conn.close()
     years = sorted(df['Year'].dropna().unique())
@@ -197,7 +197,7 @@ def update_dashboard(ticker1, ticker2, year):
     if not ticker1 or not ticker2 or ticker1 == ticker2 or (year is None):
         return "請選擇商品和年度", "", go.Figure(), go.Figure(), go.Figure(), go.Figure()
     try:
-        conn = sqlite3.connect("C:/Users/a0102/OneDrive/桌面/所有程式/STOCKDATA/newstock_data/newstock_data.db")
+        conn = sqlite3.connect("newstock_data.db")
         df1 = pd.read_sql_query(f"SELECT * FROM {ticker1}", conn)
         df2 = pd.read_sql_query(f"SELECT * FROM {ticker2}", conn)
         conn.close()
