@@ -1,0 +1,1 @@
+conn = sqlite3.connect("newstock_data.db")
