@@ -1,6 +1,0 @@
-/* 修改dcc.Slider 的 tooltip字體大小 */
-.rc-slider-tooltip-inner {
-    font-size: 22px !important;  /* 改成你想要的字級 */
-    font-family: 'Roboto Mono', 'Consolas', 'Arial', sans-serif !important;
-    font-weight: light;
-}

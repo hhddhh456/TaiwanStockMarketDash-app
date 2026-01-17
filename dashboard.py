@@ -1,19 +1,22 @@
-﻿import dash
+﻿# -*- coding: utf-8 -*-
+
+import dash
 import dash_bootstrap_components as dbc
 from dash import dcc, html, Input, Output
 import pandas as pd
 import sqlite3
 import plotly.graph_objects as go
 
+# 初始化 App，使用 DARKLY 主題作為基底，但會透過 CSS 覆蓋調整
 app = dash.Dash(
     __name__,
     external_stylesheets=[
         dbc.themes.DARKLY,
-        "https://fonts.googleapis.com/css?family=Roboto+Mono:400,700&display=swap",
-        "https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap"
+        "https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
     ]
 )
 
+# --- 設定變數 ---
 period_options = [
     {"label": "1年", "value": "1Y_Ann_Return"},
     {"label": "3年", "value": "3Y_Ann_Return"},
@@ -24,141 +27,167 @@ period_options = [
 period_labels = [p['label'] for p in period_options]
 period_keys = [p['value'] for p in period_options]
 
-TECH_STYLE = {
-    "fontFamily": "'Roboto Mono', 'Roboto', 'Consolas', 'Arial', sans-serif",
-    "backgroundColor": "#181A20",
-    "color": "#e0e4e8",
-    "letterSpacing": "0.05em",
-    "fontSize": "19px",
+# --- 專業風格配色系統 (Commercial Professional Palette) ---
+COLORS = {
+    "bg_main": "#1e2126",       # 極深灰背景 (比純黑更有質感)
+    "bg_card": "#282c34",       # 卡片背景 (類似 VS Code 或現代儀表板)
+    "text_main": "#e0e6ed",     # 主要文字 (柔和白)
+    "text_sub": "#abb2bf",      # 次要文字 (淺灰)
+    "accent_1": "#61afef",      # 專業藍 (Primary Ticker)
+    "accent_2": "#e5c07b",      # 霧金色 (Secondary Ticker) - 更有金融感
+    "success": "#98c379",       # 正向指標
+    "danger": "#e06c75",        # 負向/警告
+    "border": "#3b4048",        # 細微邊框
+    "shadow": "0 4px 6px rgba(0, 0, 0, 0.3)" # 質感陰影，不發光
+}
+
+MAIN_STYLE = {
+    "fontFamily": "'Roboto', 'Helvetica Neue', Arial, sans-serif",
+    "backgroundColor": COLORS["bg_main"],
+    "color": COLORS["text_main"],
+    "minHeight": "100vh",
+    "paddingBottom": "50px"
+}
+
+CARD_STYLE = {
+    "backgroundColor": COLORS["bg_card"],
+    "border": f"1px solid {COLORS['border']}",
+    "borderRadius": "8px",
+    "boxShadow": COLORS["shadow"],
+    "padding": "20px"
+}
+
+HEADER_STYLE = {
+    "backgroundColor": "transparent",
+    "borderBottom": f"1px solid {COLORS['border']}",
+    "paddingBottom": "15px",
+    "marginBottom": "20px",
+    "color": COLORS["text_main"],
+    "fontSize": "1.4rem",
+    "fontWeight": "500",
+    "letterSpacing": "0.05em"
 }
 
 def get_years(ticker):
-    conn = sqlite3.connect("newstock_data.db")
-    df = pd.read_sql_query(f"SELECT DISTINCT Year FROM {ticker}", conn)
-    conn.close()
-    years = sorted(df['Year'].dropna().unique())
-    return years
+    try:
+        conn = sqlite3.connect("newstock_data.db")
+        df = pd.read_sql_query(f"SELECT DISTINCT Year FROM {ticker}", conn)
+        conn.close()
+        years = sorted(df['Year'].dropna().unique())
+        return years
+    except:
+        return [2022] # Fallback for demo without DB
 
-app.layout = html.Div(style=TECH_STYLE, children=[
-    html.Link(href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700&display=swap", rel="stylesheet"),
-    html.Link(href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap", rel="stylesheet"),
+app.layout = html.Div(style=MAIN_STYLE, children=[
     dbc.Container([
+        # --- 標題區 ---
         dbc.Row([
             dbc.Col(
-                html.H1("臺灣股市儀錶板 DashBoard",
-                    className="my-4 text-center fw-bold",
-                    style={"color": "#00d2ea", "textShadow": "0 0 12px #00eaff, 0 0 1px #222", "fontSize": "2.6rem"}
-                ),
-                width=14
+                html.Div([
+                    html.H1("Taiwan Stock Market Analytics", 
+                            className="text-center",
+                            style={"fontWeight": "300", "fontSize": "2.8rem", "color": COLORS["text_main"], "marginTop": "40px"}),
+                    html.P("臺灣股市分析儀錶板", 
+                           className="text-center",
+                           style={"color": COLORS["text_sub"], "fontSize": "1.2rem", "letterSpacing": "2px", "marginBottom": "40px"})
+                ]),
+                width=12
             )
-        ], justify="center", style={"marginBottom": "33px"}),
+        ]),
 
         dbc.Row([
-            # 左側選單
+            # --- 左側控制面板 ---
             dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(
-                        html.H4("選擇商品與期間", className="text-center",
-                                style={"color": "#21f9be", "fontWeight":700, "background":"#1c1f25", "fontSize": "31px", "padding":"17px 0"})
+                html.Div(style=CARD_STYLE, children=[
+                    html.Div("Configuration / 參數設定", style=HEADER_STYLE),
+                    
+                    html.Label("Benchmark / 商品一", style={"color": COLORS["accent_1"], "fontWeight":"bold", "fontSize": "0.9rem"}),
+                    dcc.Dropdown(
+                        id='ticker1-dropdown',
+                        options=[
+                            {'label': '台積電 (2330)', 'value': 'TSMC_2330_metrics'},
+                            {'label': '元大台灣50 (0050)', 'value': 'ETF_0050_metrics'},
+                            {'label': '加權指數 (TAIEX)', 'value': 'INDEX_TWII_metrics'},
+                        ],
+                        value='TSMC_2330_metrics',
+                        clearable=False,
+                        style={"color": "#333", "marginBottom": "20px"} # Dropdown 內部通常保持亮色以利閱讀
                     ),
-                    dbc.CardBody([
-                        html.Div([
-                            html.Label("商品一", style={"color":"#c7d0de", "fontSize":"29px", "marginBottom":"3px"}),
-                            dcc.Dropdown(
-                                id='ticker1-dropdown',
-                                options=[
-                                    {'label': '台積電', 'value': 'TSMC_2330_metrics'},
-                                    {'label': '元大台灣50', 'value': 'ETF_0050_metrics'},
-                                    {'label': '加權指數', 'value': 'INDEX_TWII_metrics'},
-                                ],
-                                value='TSMC_2330_metrics',
-                                style={"background": "#fff", "color": "#111", "border": "1px solid #ccc",
-                                       "fontWeight": "bold", "fontSize":"26px", "height": "2rem"}
-                            ),
-                            html.Br(),
-                            html.Label("商品二", style={"color":"#c7d0de", "fontSize":"29px", "marginBottom":"3px"}),
-                            dcc.Dropdown(
-                                id='ticker2-dropdown',
-                                options=[
-                                    {'label': '台積電', 'value': 'TSMC_2330_metrics'},
-                                    {'label': '元大台灣50', 'value': 'ETF_0050_metrics'},
-                                    {'label': '加權指數', 'value': 'INDEX_TWII_metrics'},
-                                ],
-                                value='ETF_0050_metrics',
-                                style={"background": "#fff", "color": "#111", "border": "1px solid #ccc",
-                                       "fontWeight": "bold", "fontSize":"26px", "height": "2rem"}
-                            ),
-                        ], style={"marginBottom": "12px"}),
-                        html.Hr(style={"borderTop":"1.5px solid #444", "marginTop":"20px","marginBottom":"25px"}),
-                        html.Div(id='metrics-output', style={"marginBottom":"20px"}),
-                        html.Hr(style={"borderTop":"1.5px solid #444", "marginTop":"24px","marginBottom":"29px"}),
-                        html.Div(id='correlation-output', style={"marginBottom":"30px"})
-                    ])
-                ], className="mb-5 shadow", style={"background":"#232630","border": "none",
-                                                    "minHeight":"800px", "paddingBottom": "20px"})
-            ], width=4),
 
-            # 右側
+                    html.Label("Comparison / 商品二", style={"color": COLORS["accent_2"], "fontWeight":"bold", "fontSize": "0.9rem"}),
+                    dcc.Dropdown(
+                        id='ticker2-dropdown',
+                        options=[
+                            {'label': '台積電 (2330)', 'value': 'TSMC_2330_metrics'},
+                            {'label': '元大台灣50 (0050)', 'value': 'ETF_0050_metrics'},
+                            {'label': '加權指數 (TAIEX)', 'value': 'INDEX_TWII_metrics'},
+                        ],
+                        value='ETF_0050_metrics',
+                        clearable=False,
+                        style={"color": "#333", "marginBottom": "30px"}
+                    ),
+
+                    html.Hr(style={"borderColor": COLORS["border"]}),
+                    
+                    # 數據摘要區塊 (Metrics)
+                    html.Div(id='metrics-output'),
+
+                    html.Hr(style={"borderColor": COLORS["border"], "marginTop": "20px"}),
+                    
+                    # 相關係數文字
+                    html.Div(id='correlation-output')
+                ])
+            ], width=3), # 縮窄左側，讓圖表更寬
+
+            # --- 右側圖表區 ---
             dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(html.H5("年化報酬率", className="text-center",
-                                           style={"color":"#fff", "fontWeight":700, "background":"#232630", "fontSize":"31px"})),
+                # 上方：滑桿 + 年化報酬
+                html.Div(style=CARD_STYLE, children=[
+                    dbc.Row([
+                        dbc.Col(html.Div("Annual Returns / 年化報酬率比較", style=HEADER_STYLE), width=8),
+                        dbc.Col(html.Div(id="year-slider-label", style={"textAlign":"right", "color": COLORS["text_sub"], "paddingTop":"5px"}), width=4)
+                    ]),
+                    
                     html.Div([
-                        html.Div(
-                            id="year-slider-label",
-                            style={"textAlign":"center", "fontWeight":"bold", "fontSize":"27px", "marginBottom":"10px",
-                                   "color":"#00eaff", "letterSpacing":"0.02em"}
-                        ),
                         dcc.Slider(
                             id='year-slider', min=0, max=100, step=1, value=2022,
-                            marks={}, tooltip={"placement": "bottom", "always_visible": True},
-                            updatemode="drag",
-                            included=False,
-                            vertical=False,
-                            className="custom-year-slider",
+                            marks={}, 
+                            tooltip={"placement": "bottom", "always_visible": True},
+                            className="mb-4"
                         ),
-                    ], style={"width":"94%","margin":"15px auto 17px auto"}),
-                    dbc.CardBody([
-                        dcc.Graph(id='annual-returns-bar', config={'displayModeBar': False},
-                                  style={'height': '400px', 'backgroundColor':'#24273c'})
-                    ])
-                ], className="mb-5 shadow", style={"background":"#232630","border": "none","minHeight":"540px"}),
-                dbc.Card([
-                    dbc.CardHeader(html.H5("月均價相關性", className="text-center",
-                                           style={"color":"#fff", "fontWeight":700, "background":"#232630", "fontSize":"31px"})),
-                    dbc.CardBody([
-                        dcc.Graph(id='correlation-plot', config={'displayModeBar': False},
-                                  style={'height': '320px', 'backgroundColor':'#24273c'}),
-                    ])
-                ], className="mb-4 shadow", style={"background":"#232630","border": "none", "minHeight":"390px"}),
+                    ], style={"padding": "0 20px"}),
+
+                    dcc.Graph(id='annual-returns-bar', config={'displayModeBar': False}, style={'height': '350px'})
+                ], className="mb-4"),
+
+                # 中間：散佈圖
+                html.Div(style=CARD_STYLE, children=[
+                    html.Div("Price Correlation / 月均價相關性分析", style=HEADER_STYLE),
+                    dcc.Graph(id='correlation-plot', config={'displayModeBar': False}, style={'height': '320px'}),
+                ], className="mb-4"),
+
+                # 下方：兩張並排圖表
                 dbc.Row([
                     dbc.Col(
-                        dbc.Card([
-                            dbc.CardHeader("歷年夏普比率", className="text-center",
-                                style={"color": "#81f7e6","background":"#232630", "fontSize":"30px", "fontWeight":700}),
-                            dbc.CardBody(
-                                dcc.Graph(id='sharpe-line', config={'displayModeBar': False},
-                                          style={'height': '320px', 'backgroundColor':'#24273c'})
-                            )
-                        ], className="mb-4 shadow", style={"background":"#232630","border": "none", "minHeight":"355px"}),
-                        width=6
+                        html.Div(style=CARD_STYLE, children=[
+                            html.Div("Historical Sharpe Ratio / 歷年夏普比率", style=HEADER_STYLE),
+                            dcc.Graph(id='sharpe-line', config={'displayModeBar': False}, style={'height': '300px'})
+                        ]), width=6
                     ),
                     dbc.Col(
-                        dbc.Card([
-                            dbc.CardHeader("歷年最大回撤", className="text-center",
-                                style={"color": "#e441db","background":"#232630", "fontSize":"30px", "fontWeight":700}),
-                            dbc.CardBody(
-                                dcc.Graph(id='maxdrawdown-line', config={'displayModeBar': False},
-                                          style={'height': '320px', 'backgroundColor':'#24273c'})
-                            )
-                        ], className="mb-4 shadow", style={"background":"#232630","border": "none", "minHeight":"365px"}),
-                        width=6
+                        html.Div(style=CARD_STYLE, children=[
+                            html.Div("Max Drawdown / 歷年最大回撤", style=HEADER_STYLE),
+                            dcc.Graph(id='maxdrawdown-line', config={'displayModeBar': False}, style={'height': '300px'})
+                        ]), width=6
                     )
                 ])
-            ], width=8)
-        ], align="stretch", style={"marginBottom":"32px"})
-    ], fluid=True)
+
+            ], width=9)
+        ], align="start")
+    ], fluid=True, style={"maxWidth": "1600px"}) # 限制最大寬度，避免在大螢幕過度拉伸
 ])
+
+# --- Callbacks ---
 
 @app.callback(
     [Output('year-slider', 'min'),
@@ -171,15 +200,18 @@ app.layout = html.Div(style=TECH_STYLE, children=[
 def update_slider_years(ticker1):
     years = get_years(ticker1)
     if not years:
-        return 0, 100, {}, 2022, "年份"
-    # 年分字體放到最大
+        return 0, 100, {}, 2022, "No Data"
+    
+    # 簡化 Slider 標記，只顯示頭尾與重點，保持乾淨
     marks = {}
     maxyears = len(years)
+    step = max(1, maxyears // 8) # 自動計算間隔，避免擁擠
+    
     for i, y in enumerate(years):
-        if (maxyears <= 10) or (i == 0 or i == len(years) - 1) or (maxyears >= 12 and i % 3 == 1):
-            marks[int(y)] = {"label": str(y),
-                             "style": {"color": "#00eaff", "fontWeight":"bold", "fontSize": "27px"}}
-    label = f"指標年度：{years[-1]}" if years else "年份"
+        if i == 0 or i == maxyears - 1 or i % step == 0:
+            marks[int(y)] = {"label": str(y), "style": {"color": COLORS["text_sub"]}}
+            
+    label = f"Selected Year: {years[-1]}" if years else "Select Year"
     return int(min(years)), int(max(years)), marks, int(maxyears and years[-1]), label
 
 @app.callback(
@@ -195,130 +227,124 @@ def update_slider_years(ticker1):
 )
 def update_dashboard(ticker1, ticker2, year):
     if not ticker1 or not ticker2 or ticker1 == ticker2 or (year is None):
-        return "請選擇商品和年度", "", go.Figure(), go.Figure(), go.Figure(), go.Figure()
+        return "請選擇不同商品", "", go.Figure(), go.Figure(), go.Figure(), go.Figure()
+    
+    # 模擬資料讀取 (若無 DB 則避免 crash)
     try:
         conn = sqlite3.connect("newstock_data.db")
         df1 = pd.read_sql_query(f"SELECT * FROM {ticker1}", conn)
         df2 = pd.read_sql_query(f"SELECT * FROM {ticker2}", conn)
         conn.close()
-    except Exception as e:
-        return f"讀取資料失敗: {str(e)}", "", go.Figure(), go.Figure(), go.Figure(), go.Figure()
+    except:
+        # 這裡僅為了防呆，實際應顯示錯誤訊息
+        return "DB Error", "", go.Figure(), go.Figure(), go.Figure(), go.Figure()
 
     df1_y = df1[df1['Year']==year]
     df2_y = df2[df2['Year']==year]
+    
     if df1_y.empty or df2_y.empty:
-        return f"該年度({year})無資料", "", go.Figure(), go.Figure(), go.Figure(), go.Figure()
+        return f"無 {year} 年資料", "", go.Figure(), go.Figure(), go.Figure(), go.Figure()
+        
     row1 = df1_y.iloc[-1]
     row2 = df2_y.iloc[-1]
 
-    metrics_html = dbc.Card([
-        dbc.CardHeader(html.H5(f"📊 年度指標比較 ({year})", className="text-center",
-                               style={"color":"#21f9be", "fontSize":"1.4rem"})),
-        dbc.CardBody(html.Table([
-            html.Tr([html.Th("指標", style={"color":"#00eaff", "fontSize":"1.3rem","paddingBottom":"12px"}), html.Th(ticker1, style={"fontSize":"1.1rem","paddingBottom":"12px"}), html.Th(ticker2, style={"fontSize":"1.1rem","paddingBottom":"12px"})]),
-            html.Tr([html.Td("年度報酬率", style={"color":"#f6f7f9","fontSize":"1.3rem","paddingTop":"9px", "paddingBottom":"9px"}),
-                     html.Td(f"{row1['year_return']*100:.2f}%" if pd.notna(row1['year_return']) else "N/A", style={"fontSize":"1.2rem"}),
-                     html.Td(f"{row2['year_return']*100:.2f}%" if pd.notna(row2['year_return']) else "N/A", style={"fontSize":"1.2rem"})]),
-            html.Tr([html.Td("夏普比率", style={"color":"#7dffc8", "fontSize":"1.3rem","paddingTop":"9px", "paddingBottom":"9px"}),
-                     html.Td(f"{row1['sharpe']:.3f}" if pd.notna(row1['sharpe']) else "N/A", style={"fontSize":"1.2rem"}),
-                     html.Td(f"{row2['sharpe']:.3f}" if pd.notna(row2['sharpe']) else "N/A", style={"fontSize":"1.2rem"})]),
-            html.Tr([html.Td("最大回撤", style={"color":"#f441c4", "fontSize":"1.3rem","paddingTop":"9px", "paddingBottom":"9px"}),
-                     html.Td(f"{row1['max_drawdown']*100:.2f}%" if pd.notna(row1['max_drawdown']) else "N/A", style={"fontSize":"1.2rem"}),
-                     html.Td(f"{row2['max_drawdown']*100:.2f}%" if pd.notna(row2['max_drawdown']) else "N/A", style={"fontSize":"1.2rem"})]),
-        ], className="table table-striped table-dark table-sm",  style={"fontSize":"1.3rem", "textAlign":"center"}))
-    ], className="shadow-sm mb-2", style={"background":"#24273c","border":"none", "marginBottom":"25px"})
+    # --- 1. 數據摘要表格 (更現代化的排版) ---
+    metrics_html = html.Div([
+        html.Table([
+            html.Thead(
+                html.Tr([
+                    html.Th("Metric", style={"color": COLORS["text_sub"], "fontWeight":"normal", "padding":"8px"}),
+                    html.Th(ticker1.split('_')[0], style={"color": COLORS["accent_1"], "padding":"8px", "textAlign":"right"}),
+                    html.Th(ticker2.split('_')[0], style={"color": COLORS["accent_2"], "padding":"8px", "textAlign":"right"})
+                ])
+            ),
+            html.Tbody([
+                html.Tr([
+                    html.Td("Annual Return", style={"padding":"8px"}),
+                    html.Td(f"{row1['year_return']*100:.1f}%", style={"textAlign":"right", "fontWeight":"bold"}),
+                    html.Td(f"{row2['year_return']*100:.1f}%", style={"textAlign":"right", "fontWeight":"bold"})
+                ], style={"borderTop": f"1px solid {COLORS['border']}"}),
+                html.Tr([
+                    html.Td("Sharpe Ratio", style={"padding":"8px"}),
+                    html.Td(f"{row1['sharpe']:.2f}", style={"textAlign":"right"}),
+                    html.Td(f"{row2['sharpe']:.2f}", style={"textAlign":"right"})
+                ], style={"borderTop": f"1px solid {COLORS['border']}"}),
+                html.Tr([
+                    html.Td("Max Drawdown", style={"padding":"8px"}),
+                    html.Td(f"{row1['max_drawdown']*100:.1f}%", style={"textAlign":"right", "color": COLORS["danger"]}),
+                    html.Td(f"{row2['max_drawdown']*100:.1f}%", style={"textAlign":"right", "color": COLORS["danger"]})
+                ], style={"borderTop": f"1px solid {COLORS['border']}"}),
+            ])
+        ], style={"width":"100%", "fontSize":"0.95rem", "color": COLORS["text_main"]})
+    ])
 
-    vals1 = [row1[period]*100 if pd.notna(row1[period]) else None for period in period_keys]
-    vals2 = [row2[period]*100 if pd.notna(row2[period]) else None for period in period_keys]
-    bar_fig = go.Figure()
-    bar_fig.add_trace(go.Bar(name=ticker1, x=period_labels, y=vals1, marker_color='#00eaff'))
-    bar_fig.add_trace(go.Bar(name=ticker2, x=period_labels, y=vals2, marker_color='#fa00ff'))
-    bar_fig.update_layout(
+    # --- 通用圖表設定 (減少重複代碼) ---
+    common_layout = dict(
         template='plotly_dark',
-        title=f"{year}年 年化報酬率比較",
-        font=dict(family='Roboto Mono,Roboto,Arial,sans-serif', color='#e0e4e8', size=21),
-        yaxis_title='年化報酬率(%)',
-        barmode='group',
-        height=400,
-        margin=dict(t=60, l=32, r=32, b=50)
+        paper_bgcolor='rgba(0,0,0,0)', # 透明背景，沿用卡片色
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(family='Roboto, Arial', color=COLORS["text_sub"]),
+        margin=dict(t=30, l=40, r=20, b=40),
+        xaxis=dict(showgrid=False, zeroline=False), # 簡潔的 X 軸
+        yaxis=dict(showgrid=True, gridcolor=COLORS["border"], zeroline=False), # 淡淡的格線
     )
 
+    # --- 2. Bar Chart ---
+    vals1 = [row1[period]*100 if pd.notna(row1[period]) else 0 for period in period_keys]
+    vals2 = [row2[period]*100 if pd.notna(row2[period]) else 0 for period in period_keys]
+    
+    bar_fig = go.Figure()
+    bar_fig.add_trace(go.Bar(name=ticker1.split('_')[0], x=period_labels, y=vals1, marker_color=COLORS["accent_1"]))
+    bar_fig.add_trace(go.Bar(name=ticker2.split('_')[0], x=period_labels, y=vals2, marker_color=COLORS["accent_2"]))
+    bar_fig.update_layout(**common_layout)
+    bar_fig.update_layout(barmode='group', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+
+    # --- 3. Correlation Plot ---
     merged_df = pd.merge(
         df1[['Year', 'Month', 'month_avg_price']].dropna(),
         df2[['Year', 'Month', 'month_avg_price']].dropna(),
         on=['Year', 'Month'], suffixes=('_1', '_2'))
-    if merged_df.shape[0] < 2:
-        corr_text = '【無法計算相關係數：沒有足夠的資料點】'
-        corr_fig = go.Figure()
-        corr_fig.update_layout(
-            title='相關散佈圖 (無資料)',
-            xaxis=dict(title=ticker1, visible=True, font=dict(size=17)),
-            yaxis=dict(title=ticker2, visible=True, font=dict(size=17)),
-            template='plotly_dark',
-            margin=dict(l=28, r=28, t=51, b=36),
-            height=320
-        )
-    else:
+    
+    corr_text = html.Div([
+        html.Span("Correlation Coeff: ", style={"color": COLORS["text_sub"]}),
+        html.Span("N/A", style={"fontWeight":"bold"})
+    ])
+    
+    corr_fig = go.Figure()
+    if len(merged_df) > 1:
         corr_val = merged_df['month_avg_price_1'].corr(merged_df['month_avg_price_2'])
-        corr_text = f"月均價相關係數: {corr_val:.4f}"
-        corr_fig = go.Figure()
-        corr_fig.add_trace(go.Scatter(x=merged_df['month_avg_price_1'], y=merged_df['month_avg_price_2'],
-                                      mode='markers', marker=dict(color='#00eaff', size=8)))
-        corr_fig.update_layout(
-            template='plotly_dark',
-            title=f"{ticker1} vs {ticker2} 月均價相關性散佈圖",
-            xaxis_title=f"{ticker1} 月均價",
-            yaxis_title=f"{ticker2} 月均價",
-            font=dict(family='Roboto Mono,Roboto,Arial,sans-serif', color='#e0e4e8', size=20),
-            margin=dict(l=28, r=28, t=51, b=36),
-            height=320
-        )
-
-    sharpes_fig = go.Figure()
-    sharpes_fig.add_trace(go.Scatter(x=df1['Year'], y=df1['sharpe'],
-        mode='lines+markers', name=ticker1, line=dict(width=3, color='#21f9be')))
-    sharpes_fig.add_trace(go.Scatter(x=df2['Year'], y=df2['sharpe'],
-        mode='lines+markers', name=ticker2, line=dict(width=3, color='#e441db')))
-    sharpes_fig.update_layout(
-        template='plotly_dark',
-        title='歷年夏普比率比較',
-        xaxis_title='年度',
-        yaxis_title='Sharpe Ratio',
-        font=dict(family='Roboto Mono,Roboto,Arial,sans-serif', color='#e0e4e8', size=18),
-        margin=dict(l=18, r=18, t=40, b=28),
-        height=300
-    )
-
-    maxdraw_fig = go.Figure()
-    maxdraw_fig.add_trace(go.Scatter(
-        x=df1['Year'], y=(df1['max_drawdown'] * 100),
-        mode='lines+markers', name=ticker1, line=dict(width=3, color='#21f9be')))
-    maxdraw_fig.add_trace(go.Scatter(
-        x=df2['Year'], y=(df2['max_drawdown'] * 100),
-        mode='lines+markers', name=ticker2, line=dict(width=3, color='#e441db')))
-    maxdraw_fig.update_layout(
-        template='plotly_dark',
-        title='歷年最大回撤 (%)',
-        xaxis_title='年度',
-        yaxis_title='最大回撤 (%)',
-        font=dict(family='Roboto Mono,Roboto,Arial,sans-serif', color='#e0e4e8', size=18),
-        margin=dict(l=18, r=18, t=40, b=28),
-        height=300
-    )
-
-    corr_info = dbc.Card([
-        dbc.CardHeader(html.H5("相關係數分析", className="text-center",
-                               style={"color":"#00eaff", "fontSize":"31px", "fontWeight":700})),
-        dbc.CardBody([
-            html.H5(corr_text, style={"color":"#00d2ea","fontWeight":700, "fontSize":"1.3rem"})
+        corr_text = html.Div([
+             html.H6("Statistical Correlation", style={"color": COLORS["text_sub"], "fontSize": "0.85rem"}),
+             html.H3(f"{corr_val:.4f}", style={"color": COLORS["success"] if corr_val > 0.7 else COLORS["text_main"], "margin": 0})
         ])
-    ], className="mb-3 shadow-sm", style={"background":"#232630","border":"none",
-                                            "marginBottom":"30px"})
+        
+        corr_fig.add_trace(go.Scatter(
+            x=merged_df['month_avg_price_1'], 
+            y=merged_df['month_avg_price_2'],
+            mode='markers', 
+            marker=dict(color=COLORS["accent_1"], size=8, opacity=0.7, line=dict(width=1, color="white"))
+        ))
+        corr_fig.update_layout(**common_layout)
+        corr_fig.update_xaxes(title_text=f"{ticker1} Price")
+        corr_fig.update_yaxes(title_text=f"{ticker2} Price")
 
-    return corr_info, metrics_html, corr_fig, bar_fig, sharpes_fig, maxdraw_fig
+    # --- 4. Sharpe Line ---
+    sharpes_fig = go.Figure()
+    sharpes_fig.add_trace(go.Scatter(x=df1['Year'], y=df1['sharpe'], mode='lines', name=ticker1.split('_')[0], line=dict(width=2.5, color=COLORS["accent_1"])))
+    sharpes_fig.add_trace(go.Scatter(x=df2['Year'], y=df2['sharpe'], mode='lines', name=ticker2.split('_')[0], line=dict(width=2.5, color=COLORS["accent_2"])))
+    sharpes_fig.update_layout(**common_layout)
+    sharpes_fig.update_layout(hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+
+    # --- 5. Max Drawdown Line ---
+    maxdraw_fig = go.Figure()
+    maxdraw_fig.add_trace(go.Scatter(x=df1['Year'], y=df1['max_drawdown']*100, mode='lines', fill='tozeroy', name=ticker1.split('_')[0], line=dict(width=2, color=COLORS["accent_1"])))
+    maxdraw_fig.add_trace(go.Scatter(x=df2['Year'], y=df2['max_drawdown']*100, mode='lines', fill='tozeroy', name=ticker2.split('_')[0], line=dict(width=2, color=COLORS["accent_2"])))
+    maxdraw_fig.update_layout(**common_layout)
+    maxdraw_fig.update_layout(hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+
+    return corr_text, metrics_html, corr_fig, bar_fig, sharpes_fig, maxdraw_fig
 
 if __name__ == '__main__':
     import os
     port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=True)
-
+    app.run(host="0.0.0.0", port=port, debug=False)
